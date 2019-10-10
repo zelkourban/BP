@@ -1,0 +1,18 @@
+Prehlad knižníc pre vizualizáciu konvolučných neuronových sietí:
+    -lucid
+
+    -tensorspace
+    https://github.com/tensorspace-team/tensorspace
+    
+    -keras-vis
+    https://github.com/raghakot/keras-vis
+    
+    -tf_convis
+    https://github.com/InFoCusp/tf_cnnvis
+    
+    -cnn-viz
+    https://github.com/pranshu28/cnn-viz
+
+-
+-
+-
