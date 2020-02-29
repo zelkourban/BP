@@ -4,4 +4,5 @@ matplotlib
 torch
 torchvision
 python-opencv
+easygui
 tqdm
