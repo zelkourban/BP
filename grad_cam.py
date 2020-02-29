@@ -78,12 +78,12 @@ def preprocess_image(img):
     return input
 
 
-def show_cam_on_image(img, mask):
+def show_cam_on_image(img, mask,name):
     heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
     cam = heatmap + np.float32(img)
     cam = cam / np.max(cam)
-    cv2.imwrite("generated_grad/cam.jpg", np.uint8(255 * cam))
+    cv2.imwrite('generated_grad/' + name + '_cam.jpg', np.uint8(255 * cam))
 
 
 class GradCam:
@@ -268,29 +268,36 @@ def run_from_import():
     grad_cam = GradCam(model=models.vgg19(pretrained=True), \
                            target_layer_names=["35"], use_cuda=False)
     classes = get_classtable()
-    img = cv2.imread('./input_images/input.jpg', 1)
+    print("Press Enter to choose image input...",end='')
+    input()
+    
+    file = easygui.fileopenbox()
+    img = cv2.imread(file, 1)
     img = np.float32(cv2.resize(img, (224, 224))) / 255
-    input = preprocess_image(img)
+    input_image = preprocess_image(img)
     
     target_index = None
-    mask = grad_cam(input, target_index)
+    mask = grad_cam(input_image, target_index)
     
-    show_cam_on_image(img, mask)
+    print("Choose image name: ",end='')
+    name = input()
+
+    show_cam_on_image(img, mask,name)
 
     gb_model = GuidedBackpropReLUModel(model=models.vgg19(pretrained=True), use_cuda=False)
     
-    gb = gb_model(input, index=target_index)
+    gb = gb_model(input_image, index=target_index)
     gb = gb.transpose((1, 2, 0))
     cam_mask = cv2.merge([mask, mask, mask])
     cam_gb = deprocess_image(cam_mask*gb)
     gb = deprocess_image(gb)
     
     
-    cv2.imwrite('generated_grad/gb.jpg', gb)
-    print('generated_grad/gb.jpg written')
-    cv2.imwrite('generated_grad/cam_gb.jpg', cam_gb)
-    print('generated_grad/cam_gb.jpg written')
-    print("Succesfully Generated images.")
+    cv2.imwrite('generated_grad/'+ name + '_gb.jpg', gb)
+    print('generated_grad/'+ name + '_gb.jpg written')
+    cv2.imwrite('generated_grad/'+ name + '_cam_gb.jpg', cam_gb)
+    print('generated_grad/'+ name + '_cam_gb.jpg written')
+    print("Succesfully generated images.")
 
 if __name__ == '__main__':
     """ python grad_cam.py <path_to_image>
