@@ -271,34 +271,41 @@ def run_from_import():
     print("Press Enter to choose image input...",end='')
     input()
     
+
     file = easygui.fileopenbox()
-    img = cv2.imread(file, 1)
-    img = np.float32(cv2.resize(img, (224, 224))) / 255
-    input_image = preprocess_image(img)
+    if(file):
+        img = cv2.imread(file, 1)
+        img = np.float32(cv2.resize(img, (224, 224))) / 255
+        input_image = preprocess_image(img)
     
-    target_index = None
-    mask = grad_cam(input_image, target_index)
+        target_index = None
+        mask = grad_cam(input_image, target_index)
     
-    print("Choose image name: ",end='')
-    name = input()
+        print("Choose image name: ",end='')
+        name = input()
 
-    show_cam_on_image(img, mask,name)
+        show_cam_on_image(img, mask,name)
 
-    gb_model = GuidedBackpropReLUModel(model=models.vgg19(pretrained=True), use_cuda=False)
+        gb_model = GuidedBackpropReLUModel(model=models.vgg19(pretrained=True), use_cuda=False)
     
-    gb = gb_model(input_image, index=target_index)
-    gb = gb.transpose((1, 2, 0))
-    cam_mask = cv2.merge([mask, mask, mask])
-    cam_gb = deprocess_image(cam_mask*gb)
-    gb = deprocess_image(gb)
-    
-    
-    cv2.imwrite('generated_grad/'+ name + '_gb.jpg', gb)
-    print('generated_grad/'+ name + '_gb.jpg written')
-    cv2.imwrite('generated_grad/'+ name + '_cam_gb.jpg', cam_gb)
-    print('generated_grad/'+ name + '_cam_gb.jpg written')
-    print("Succesfully generated images.")
+        gb = gb_model(input_image, index=target_index)
+        gb = gb.transpose((1, 2, 0))
+        cam_mask = cv2.merge([mask, mask, mask])
+        cam_gb = deprocess_image(cam_mask*gb)
+        gb = deprocess_image(gb)
 
+        cv2.imwrite('generated_grad/'+ name + '_gb.jpg', gb)
+        print('generated_grad/'+ name + '_gb.jpg written')
+        cv2.imwrite('generated_grad/'+ name + '_cam_gb.jpg', cam_gb)
+        print('generated_grad/'+ name + '_cam_gb.jpg written')
+        print("Succesfully generated images.")
+
+    else:
+        print("File not chosen.")
+        
+    
+    
+   
 if __name__ == '__main__':
     """ python grad_cam.py <path_to_image>
     1. Loads an image with opencv.
