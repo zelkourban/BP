@@ -3,6 +3,7 @@ Pillow
 matplotlib
 torch
 torchvision
-python-opencv
+opencv-python
+pyfzf
 easygui
 tqdm
