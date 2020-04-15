@@ -360,14 +360,14 @@ def rcv_init():
     while True:
         input_print('Press enter to select network architecture...')
         fzf = FzfPrompt()
-        network = fzf.prompt(nets)
+        network = fzf.prompt(nets,"--reverse")
         classes_list = open('classes_names.txt','r').read().split('\n') 
         classes_dict = {}
         for i in range(len(classes_list)):
             classes_dict[classes_list[i]] = i
 
         input_print('Press enter to select class...') 
-        class_name = fzf.prompt(classes_list)[0]
+        class_name = fzf.prompt(classes_list, "--reverse")[0]
         iterations = numInput("Select number of iterations (1-infinity): ")
         os.system("clear")
         confirm = input_print('Architecture: {}\nClass: {}\nIterations: {}\nConfirm(y/n)? '.format(network[0],class_name,iterations))
@@ -383,7 +383,7 @@ def layer_vis():
     ##printf(nets[-1] + ": ")
        
     fzf = FzfPrompt()
-    a = fzf.prompt(nets)[0]
+    a = fzf.prompt(nets, "--reverse")[0]
     print(a);
                 
     l = numInput("Choose layer: 0-255: ")
