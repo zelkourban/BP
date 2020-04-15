@@ -11,7 +11,8 @@ import cv2
 from tqdm import tqdm
 import time
 import grad_cam
-
+from pyfzf.pyfzf import FzfPrompt
+import regularized_class_sample_generator
 
 def format_np_output(np_arr):
     """
@@ -317,7 +318,7 @@ class Net:
    
     
 
-    def generate(self,anim):
+    def generate(self):
         image = input_print("Choose image name: ")
         image_name = image + '_layer' + str(self.layer) + '_filter' + str(self.filter) + ".jpg"
         print("\nGenerating " + image_name + "...")
@@ -325,19 +326,16 @@ class Net:
         pretrained_model = getattr(models,self.arch)(pretrained=True).features
       
         layer_vis = CNNLayerVisualization(pretrained_model, int(self.layer), int(self.filter),image)
-        if(not anim):
-            layer_vis.visualise_layer_without_hooks(scale=2)
-        else:
-            layer_vis.anim_optimisation(scale=4)
-            layer_vis.visualise_layer_without_hooks(scale=2)
+        
+        layer_vis.visualise_layer_without_hooks(scale=2)
         print("{}.png succesfully generated".format(image_name))
 
-    def write(self,anim):
+    def write(self):
         print("\n\nArchitecture: {}\nLayer: {}\nFilter {}".format(self.arch,self.layer,self.filter))
         
         printf("\n\nConfirm?(y/n): ")
         if(input() == 'y'):
-            self.generate(anim)
+            self.generate()
         else:
             main()   
                  
@@ -357,34 +355,52 @@ def testNum(n):
 def exiting():
     print("Exiting program...")
     exit()
-        
+
+def rcv_init():
+    while True:
+        input_print('Press enter to select network architecture...')
+        fzf = FzfPrompt()
+        network = fzf.prompt(nets)
+        classes_list = open('classes_names.txt','r').read().split('\n') 
+        classes_dict = {}
+        for i in range(len(classes_list)):
+            classes_dict[classes_list[i]] = i
+
+        input_print('Press enter to select class...') 
+        class_name = fzf.prompt(classes_list)[0]
+        iterations = numInput("Select number of iterations (1-infinity): ")
+        os.system("clear")
+        confirm = input_print('Architecture: {}\nClass: {}\nIterations: {}\nConfirm(y/n)? '.format(network[0],class_name,iterations))
+        if(confirm == 'n'):
+            os.system("clear")
+            continue
+        regularized_class_sample_generator.run_from_import(classes_dict[class_name],network[0],int(iterations),class_name)
+        break
+
 def layer_vis():
-    printf("Choose network: ")
-    [ printf(nets[i] + ", ") for i in range(len(nets)-1)]
-    printf(nets[-1] + ": ")
+    input_print("Choose network: ")
+    ##[ printf(nets[i] + ", ") for i in range(len(nets)-1)]
+    ##printf(nets[-1] + ": ")
        
-    a = input()
-    if (not a in nets):
-        print("No net by name {}".format(a))
-        main()
-    
-            
-    
+    fzf = FzfPrompt()
+    a = fzf.prompt(nets)[0]
+    print(a);
+                
     l = numInput("Choose layer: 0-255: ")
     f = numInput("Choose filter: 0-55: ")
         
-    while True:
-        anim = input_print("Animate optimisation?(y/n): ")
-        if(anim == "y" or anim == 'yes'):
-            anim = True
-            break
-        elif(anim == "n" or anim == 'no'):
-            anim = False
-            break
+    #while True:
+        #anim = input_print("Animate optimisation?(y/n): ")
+        #if(anim == "y" or anim == 'yes'):
+            #anim = True
+            #break
+        #elif(anim == "n" or anim == 'no'):
+            #anim = False
+            #break
         
         
     net = Net(a,l,f)
-    net.write(anim)
+    net.write()
        
 
 def main():
@@ -398,7 +414,7 @@ def main():
         
     os.system("clear")
     print("--------- CNN Visualizer ---------\n")
-    print("1. Filter, layer visualisation\n2. Grad-Cam visualisation\n3. Exit")
+    print("1. Filter, layer visualisation\n2. Grad-Cam visualisation\n3. Regularized class visualization\n4. Exit")
     while True:
         p_choose = numInput("Choose option: ")
         
@@ -406,10 +422,14 @@ def main():
             layer_vis()
             exiting()
         elif(int(p_choose) == 2):
-            print("GradCam choosen.")
-            grad_cam.run_from_import()
+            print("GradCam selected.")
+            grad_cam.grad_cam_all_layers()
             exiting()
         elif(int(p_choose) == 3):
+            print("RCV selected.")
+            rcv_init()
+            exiting()
+        elif(int(p_choose) == 4):
             exiting()
         os.system("clear")
     

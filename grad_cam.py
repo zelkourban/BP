@@ -2,6 +2,7 @@ import argparse
 import cv2
 import numpy as np
 import torch
+import os
 import easygui
 from tqdm import tqdm
 from torch.autograd import Function
@@ -9,6 +10,7 @@ from torchvision import models
 
 def get_classtable():
     classes = []
+    
     with open("classes.txt") as lines:
         for line in lines:
             line = line.strip().split(" ", 1)[1]
@@ -56,7 +58,7 @@ class ModelOutputs():
         target_activations, output = self.feature_extractor(x)
         output = output.view(output.size(0), -1)
         output = self.model.classifier(output)
-        print(output)
+        
         return target_activations, output
 
 
@@ -76,6 +78,33 @@ def preprocess_image(img):
     input = preprocessed_img.requires_grad_(True)
     print("Done.")
     return input
+
+
+
+def show_cam_on_live(img, mask,name):
+    heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+    heatmap = np.float32(heatmap) / 255
+    cam = heatmap + np.float32(img)
+    cam = cam / np.max(cam)
+    return  np.uint8(255 * cam) 
+ 
+
+def show_cam_on_layer_grid(img, masks):
+    images = []
+    for mask in masks:
+        print("maska")
+        print(mask)
+        heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+        heatmap = np.float32(heatmap) / 255
+        cam = heatmap + np.float32(img)
+        cam = cam / np.max(cam)
+        output = np.uint8(255 * cam)
+        
+        
+        images.append(output)
+    return images
+    #cv2.imwrite('generated_grad/' + name + '_cam.jpg', np.uint8(255 * cam))
+
 
 
 def show_cam_on_image(img, mask,name):
@@ -98,6 +127,48 @@ class GradCam:
 
     def forward(self, input):
         return self.model(input)
+
+    def grad_all_layers(self, input, layers):
+        index = 0
+        images = []
+        
+        for i in range(layers):
+           
+            self.extractor = ModelOutputs(self.model, [str(i)])
+            features, output = self.extractor(input)
+            index = np.argmax(output.cpu().data.numpy())
+            one_hot = np.zeros((1, output.size()[-1]), dtype=np.float32)
+            one_hot[0][index] = 1
+            one_hot = torch.from_numpy(one_hot).requires_grad_(True)
+            if self.cuda:
+                one_hot = torch.sum(one_hot.cuda() * output)
+            else:
+                one_hot = torch.sum(one_hot * output)
+
+            self.model.features.zero_grad()
+            self.model.classifier.zero_grad()
+            one_hot.backward(retain_graph=True)
+
+            grads_val = self.extractor.get_gradients()[-1].cpu().data.numpy()
+
+            target = features[-1]
+            target = target.cpu().data.numpy()[0, :]
+
+            weights = np.mean(grads_val, axis=(2, 3))[0, :]
+            cam = np.zeros(target.shape[1:], dtype=np.float32)
+
+            print("generating grad-cam...")
+            for i, w in tqdm(enumerate(weights)):
+                cam += w * target[i, :, :]
+
+            cam = np.maximum(cam, 0)
+            cam = cv2.resize(cam, (224, 224))
+            cam = cam - np.min(cam)
+            cam = cam / np.max(cam)
+            print("Done.")
+            index += 1
+            images.append(cam)
+        return images
 
     def __call__(self, input, index=None):
         if self.cuda:
@@ -245,23 +316,48 @@ def live(gradcam,img):
     target_index = None
     mask = gradcam(input, target_index)
     
-    show_cam_on_image(img, mask)
-
-    gb_model = GuidedBackpropReLUModel(model=models.vgg19(pretrained=True), use_cuda=False)
-    gb = gb_model(input, index=target_index)
-    gb = gb.transpose((1, 2, 0))
-    cam_mask = cv2.merge([mask, mask, mask])
-    cam_gb = deprocess_image(cam_mask*gb)
-    gb = deprocess_image(gb)
+    show_cam_on_live(img, mask)
     
-    return cam_gb
-    #cv2.imwrite('generated_grad/gb.jpg', gb)
-    #print('generated_grad/gb.jpg written')
-    #cv2.imwrite('generated_grad/cam_gb.jpg', cam_gb)
-    #print('generated_grad/cam_gb.jpg written')
-    #print("Succesfully Generated images.")
+   
 
+
+def grad_cam_all_layers():
+    grad_cam = GradCam(model=models.vgg19(pretrained=True), \
+                           target_layer_names=["35"], use_cuda=False)
+    classes = get_classtable()
+    print("Press Enter to choose image input...",end='')
+    input()
     
+    file = easygui.fileopenbox()
+    if(file):
+        img = cv2.imread(file, 1)
+        img = np.float32(cv2.resize(img, (224, 224))) / 255
+        input_image = preprocess_image(img)
+        masks = grad_cam.grad_all_layers(input_image, 35)
+    images = show_cam_on_layer_grid(img,masks)
+    i = 0
+    os.system("rm ./animation/*.jpg")
+    for image in images:
+        cv2.imwrite('./animation/' + str(i) + '.jpg', image)
+        i+=1
+    j = 0
+    horiz = []
+    
+    for i in range(5):
+        horiz.append(np.concatenate(images[j:j+7], axis=1))
+        j+=7
+    grid_image = np.concatenate(horiz,axis=0)
+    print("Choose name for grid image: ",end="")
+    name = input()
+    cv2.imwrite('./generated_grad/' + name + '.jpg',grid_image)
+    print("generate video(y/n)?",end='')
+    video = input()
+    if(video == "y"):
+        print("Choose file name: ",end='')
+        name = input()
+        os.system("ffmpeg -r 5 -i ./animation/%d.jpg -vb 20M ./animation/" + name + ".avi")
+        os.system("rm ./animation/*.jpg")
+    #[cv2.imwrite('./test/' + str(i) + '.jpg',image) for image in images]
 
 def run_from_import():
     
@@ -277,7 +373,6 @@ def run_from_import():
         img = cv2.imread(file, 1)
         img = np.float32(cv2.resize(img, (224, 224))) / 255
         input_image = preprocess_image(img)
-    
         target_index = None
         mask = grad_cam(input_image, target_index)
     
